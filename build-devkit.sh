@@ -3,6 +3,7 @@
 #	devkitARM release 62
 #	devkitPPC release 44.2
 #	devkitA64 release 24
+#	devkitX64 release 1
 #---------------------------------------------------------------------------------
 
 if [ 0 -eq 1 ] ; then
@@ -33,6 +34,8 @@ DKARM_CRTLS_VER=1.2.2
 DKPPC_RULES_VER=1.2.1
 
 DKA64_RULES_VER=1.1.1
+
+DKX64_RULES_VER=1.0.0
 
 OSXMIN=${OSXMIN:-10.9}
 
@@ -190,6 +193,10 @@ if [ "$BUILD_DKPRO_SKIP_CRTLS" != "1" ]; then
 
 	if [ $VERSION -eq 3 ]; then
 		archives="devkita64-rules-$DKA64_RULES_VER.tar.gz $archives"
+	fi
+
+	if [ $VERSION -eq 4 ]; then
+		archives="devkitx64-rules-$DKX64_RULES_VER.tar.gz $archives"
 	fi
 fi
 

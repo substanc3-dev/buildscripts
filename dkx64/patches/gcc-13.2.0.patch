@@ -1,0 +1,203 @@
+diff --git a/gcc/config.gcc b/gcc/config.gcc
+index 648b3dc21..12c0ff7df 100644
+--- a/gcc/config.gcc
++++ b/gcc/config.gcc
+@@ -1865,7 +1865,13 @@ i[34567]86-*-elf*)
+ 	tm_file="${tm_file} i386/unix.h i386/att.h elfos.h newlib-stdint.h i386/i386elf.h"
+ 	;;
+ x86_64-*-elf*)
+-	tm_file="${tm_file} i386/unix.h i386/att.h elfos.h newlib-stdint.h i386/i386elf.h i386/x86-64.h"
++	default_use_cxa_atexit=yes
++	tm_file="${tm_file} i386/unix.h i386/att.h elfos.h newlib-stdint.h i386/i386elf.h i386/x86-64.h devkitpro.h"
++	tm_defines="${tm_defines}  TARGET_DEFAULT_ASYNC_UNWIND_TABLES=1"
++	extra_options="${extra_options} devkitpro.opt"
++	case ${enable_threads} in
++		"" | yes | posix) thread_file='posix' ;;
++	esac
+ 	;;
+ x86_64-*-rtems*)
+ 	tm_file="${tm_file} i386/unix.h i386/att.h elfos.h newlib-stdint.h i386/i386elf.h i386/x86-64.h i386/rtemself.h rtems.h"
+diff --git a/gcc/config/devkitpro.h b/gcc/config/devkitpro.h
+new file mode 100644
+index 000000000..49479d7c0
+--- /dev/null
++++ b/gcc/config/devkitpro.h
+@@ -0,0 +1,31 @@
++/* Definitions for devkitPro toolchains.
++   Copyright (C) 2016-2018 Free Software Foundation, Inc.
++
++   This file is part of GCC.
++
++   GCC is free software; you can redistribute it and/or modify it
++   under the terms of the GNU General Public License as published
++   by the Free Software Foundation; either version 3, or (at your
++   option) any later version.
++
++   GCC is distributed in the hope that it will be useful, but WITHOUT
++   ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
++   or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
++   License for more details.
++
++   Under Section 7 of GPL version 3, you are granted additional
++   permissions described in the GCC Runtime Library Exception, version
++   3.1, as published by the Free Software Foundation.
++
++   You should have received a copy of the GNU General Public License and
++   a copy of the GCC Runtime Library Exception along with this program;
++   see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#undef TARGET_OS_CPP_BUILTINS
++#define TARGET_OS_CPP_BUILTINS()                \
++    do {                                        \
++        builtin_define ("__DEVKITX64__");       \
++        builtin_define ("__DEVKITPRO__");       \
++    } while (0)
++
+diff --git a/gcc/config/devkitpro.opt b/gcc/config/devkitpro.opt
+new file mode 100644
+index 000000000..0df94c026
+--- /dev/null
++++ b/gcc/config/devkitpro.opt
+@@ -0,0 +1,29 @@
++; Options for devkitPro toolchains.
++
++; Copyright (C) 2011-2018 Free Software Foundation, Inc.
++;
++; This file is part of GCC.
++;
++; GCC is free software; you can redistribute it and/or modify it under
++; the terms of the GNU General Public License as published by the Free
++; Software Foundation; either version 3, or (at your option) any later
++; version.
++;
++; GCC is distributed in the hope that it will be useful, but WITHOUT ANY
++; WARRANTY; without even the implied warranty of MERCHANTABILITY or
++; FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
++; for more details.
++;
++; You should have received a copy of the GNU General Public License
++; along with GCC; see the file COPYING3.  If not see
++; <http://www.gnu.org/licenses/>.
++
++; See the GCC internals manual (options.texi) for a description of
++; this file's format.
++
++; Please try to keep this file in ASCII collating order.
++
++pthread
++Driver
++
++; This comment is to ensure we retain the blank line above.
+\ No newline at end of file
+diff --git a/gcc/config/i386/host-mingw32.cc b/gcc/config/i386/host-mingw32.cc
+index acff6138d..8dc91b75f 100644
+--- a/gcc/config/i386/host-mingw32.cc
++++ b/gcc/config/i386/host-mingw32.cc
+@@ -93,7 +93,10 @@ mingw32_gt_pch_get_address (size_t size, int)
+      for NT system dlls is in 0x70000000 to 0x78000000 range.
+      If we allocate at bottom we need to reserve the address as early
+      as possible and at the same point in each invocation. */
+- 
++
++#if __MINGW64__
++  size  = UINT64_C(64 * 1024 * 1024 * 1024);
++#endif
+   res = VirtualAlloc (NULL, size,
+ 		      MEM_RESERVE | MEM_TOP_DOWN,
+ 		      PAGE_NOACCESS);
+diff --git a/gcc/config/i386/t-i386 b/gcc/config/i386/t-i386
+index b417c7f17..68df01e55 100644
+--- a/gcc/config/i386/t-i386
++++ b/gcc/config/i386/t-i386
+@@ -75,3 +75,8 @@ s-i386-bt: $(srcdir)/config/i386/i386-builtin-types.awk \
+ 	$(AWK) -f $^ > tmp-bt.inc
+ 	$(SHELL) $(srcdir)/../move-if-change tmp-bt.inc i386-builtin-types.inc
+ 	$(STAMP) $@
++
++MULTILIB_OPTIONS    = mcmodel=large fPIC
++MULTILIB_DIRNAMES   = large pic
++MULTILIB_REQUIRED   = mcmodel=large fPIC
++MULTILIB_MATCHES    = fPIC=fpic fPIC=fpie fPIC=fPIE
+\ No newline at end of file
+diff --git a/gcc/gcc.cc b/gcc/gcc.cc
+index 16bb07f2c..b77babe88 100644
+--- a/gcc/gcc.cc
++++ b/gcc/gcc.cc
+@@ -868,6 +868,10 @@ proper position among the other output files.  */
+ #endif
+ #endif
+ 
++#ifndef LIBGLOSS_SPEC
++# define LIBGLOSS_SPEC "-lsysbase"
++#endif
++
+ /* config.h can define STARTFILE_SPEC to override the default crt0 files.  */
+ #ifndef STARTFILE_SPEC
+ #define STARTFILE_SPEC  \
+@@ -1191,6 +1195,7 @@ static const char *link_spec = LINK_SPEC;
+ static const char *lib_spec = LIB_SPEC;
+ static const char *link_gomp_spec = "";
+ static const char *libgcc_spec = LIBGCC_SPEC;
++static const char *libgloss_spec = LIBGLOSS_SPEC;
+ static const char *endfile_spec = ENDFILE_SPEC;
+ static const char *startfile_spec = STARTFILE_SPEC;
+ static const char *linker_name_spec = LINKER_NAME;
+@@ -1701,6 +1706,7 @@ static struct spec_list static_specs[] =
+   INIT_STATIC_SPEC ("lib",			&lib_spec),
+   INIT_STATIC_SPEC ("link_gomp",		&link_gomp_spec),
+   INIT_STATIC_SPEC ("libgcc",			&libgcc_spec),
++  INIT_STATIC_SPEC ("libgloss",			&libgloss_spec),
+   INIT_STATIC_SPEC ("startfile",		&startfile_spec),
+   INIT_STATIC_SPEC ("cross_compile",		&cross_compile),
+   INIT_STATIC_SPEC ("version",			&compiler_version),
+diff --git a/libgcc/crtstuff.c b/libgcc/crtstuff.c
+index 93ff5b81d..20c0fe89a 100644
+--- a/libgcc/crtstuff.c
++++ b/libgcc/crtstuff.c
+@@ -326,7 +326,7 @@ register_tm_clones (void)
+ 
+ #ifdef OBJECT_FORMAT_ELF
+ 
+-#if DEFAULT_USE_CXA_ATEXIT
++#if 1 /* DEFAULT_USE_CXA_ATEXIT */
+ /* Declare the __dso_handle variable.  It should have a unique value
+    in every shared-object; in a main program its value is zero.  The
+    object should in any case be protected.  This means the instance
+diff --git a/libgcc/gthr.h b/libgcc/gthr.h
+index 1989c0c86..afc369658 100644
+--- a/libgcc/gthr.h
++++ b/libgcc/gthr.h
+@@ -136,7 +136,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+ /* The pe-coff weak support isn't fully compatible to ELF's weak.
+    For static libraries it might would work, but as we need to deal
+    with shared versions too, we disable it for mingw-targets.  */
+-#ifdef __MINGW32__
++#if defined(__MINGW32__) || defined(__DEVKITX64__)
+ #undef GTHREAD_USE_WEAK
+ #define GTHREAD_USE_WEAK 0
+ #endif
+diff --git a/libstdc++-v3/include/Makefile.am b/libstdc++-v3/include/Makefile.am
+index a880e8ee2..ac9c60aa5 100644
+--- a/libstdc++-v3/include/Makefile.am
++++ b/libstdc++-v3/include/Makefile.am
+@@ -1417,6 +1417,7 @@ ${host_builddir}/gthr.h: ${toplevel_srcdir}/libgcc/gthr.h stamp-${host_alias}
+ 	    -e '/^#/s/\(${uppercase}${uppercase}*\)/_GLIBCXX_\1/g' \
+ 	    -e 's/_GLIBCXX_SUPPORTS_WEAK/__GXX_WEAK__/g' \
+ 	    -e 's/_GLIBCXX___MINGW32_GLIBCXX___/__MINGW32__/g' \
++	    -e 's/_GLIBCXX___DEVKITX64_GLIBCXX___/__DEVKITX64__/g' \
+ 	    -e 's,^#include "\(.*\)",#include <bits/\1>,g' \
+ 	    < $< > $@
+ 
+diff --git a/libstdc++-v3/include/Makefile.in b/libstdc++-v3/include/Makefile.in
+index 0ff875b28..07aae2ec8 100644
+--- a/libstdc++-v3/include/Makefile.in
++++ b/libstdc++-v3/include/Makefile.in
+@@ -1891,6 +1891,7 @@ ${host_builddir}/gthr.h: ${toplevel_srcdir}/libgcc/gthr.h stamp-${host_alias}
+ 	    -e '/^#/s/\(${uppercase}${uppercase}*\)/_GLIBCXX_\1/g' \
+ 	    -e 's/_GLIBCXX_SUPPORTS_WEAK/__GXX_WEAK__/g' \
+ 	    -e 's/_GLIBCXX___MINGW32_GLIBCXX___/__MINGW32__/g' \
++	    -e 's/_GLIBCXX___DEVKITX64_GLIBCXX___/__DEVKITX64__/g' \
+ 	    -e 's,^#include "\(.*\)",#include <bits/\1>,g' \
+ 	    < $< > $@
+ 

@@ -1,8 +1,8 @@
 devkitPro build scripts
 --------------------------
 
-This readme will guide you through building devkitARM, devkitPPC or devkitA64
-from source using a set of scripts.
+This readme will guide you through building devkitARM, devkitPPC, devkitA64 or
+devkitX64 from source using a set of scripts.
 
 Please note that we can't guarantee that what you build with these scripts
 will function in the same way as the binaries we distribute. Where possible
